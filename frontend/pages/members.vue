@@ -146,7 +146,19 @@
               <span class="rounded bg-[#f0fdf4] px-1.5 py-0.5 text-[10px] font-medium text-[#047857]">AI</span>
               <span class="text-[14px] font-medium text-[#111827]">群聊总结报告</span>
             </div>
-            <div v-if="summaryNotice" class="text-[11px]" :class="summary?.llm?.error ? 'text-amber-600' : 'text-[#9ca3af]'">{{ summaryNotice }}</div>
+            <div class="flex items-center gap-3">
+              <span v-if="exportError" class="text-[11px] text-amber-600">{{ exportError }}</span>
+              <span v-if="summaryNotice" class="text-[11px]" :class="summary?.llm?.error ? 'text-amber-600' : 'text-[#9ca3af]'">{{ summaryNotice }}</span>
+              <button
+                v-if="summaryReport && !summaryLoading"
+                type="button"
+                class="rounded-md border border-[#e5e7eb] px-2.5 py-1 text-[11px] text-[#374151] transition hover:border-[#07C160] hover:text-[#07C160] disabled:opacity-60"
+                :disabled="exporting"
+                @click="handleExportPoster"
+              >
+                {{ exporting ? '生成中…' : '导出图片' }}
+              </button>
+            </div>
           </div>
 
           <div v-if="summaryLoading" class="px-4 py-10 text-center text-[13px] text-[#6b7280]">
@@ -295,6 +307,7 @@
 import { storeToRefs } from 'pinia'
 import { useChatAccountsStore } from '~/stores/chatAccounts'
 import { usePrivacyStore } from '~/stores/privacy'
+import { downloadReportPoster } from '~/utils/reportPoster'
 
 useHead({ title: '成员发言统计 - 微信数据分析助手' })
 
@@ -319,6 +332,7 @@ const topicCount = ref(8)
 const aiMainThread = ref(false)
 const summary = ref(null)
 const summaryLoading = ref(false)
+const exporting = ref(false)
 let requestId = 0
 let summaryRequestId = 0
 
@@ -509,6 +523,28 @@ const loadGroupSummary = async () => {
 const handleRefresh = () => {
   loadOverview({ force: true })
   if (aiMainThread.value) loadGroupSummary()
+}
+
+const exportError = ref('')
+
+const handleExportPoster = async () => {
+  if (!summaryReport.value || exporting.value) return
+  exporting.value = true
+  exportError.value = ''
+  try {
+    await downloadReportPoster({
+      groupName: summary.value?.groupName || currentSessionName.value,
+      report: summaryReport.value,
+      topMembers: summaryTopMembers.value,
+      totals: totals.value,
+      rangeText: rangeText.value,
+      model: summary.value?.llm?.model || 'AI',
+    })
+  } catch (e) {
+    exportError.value = String(e?.message || '导出失败')
+  } finally {
+    exporting.value = false
+  }
 }
 
 watch(selectedAccount, () => {
