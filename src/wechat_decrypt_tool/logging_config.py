@@ -226,7 +226,17 @@ class WeChatLogger:
         # logging is both redundant and unsafe even when debug logging is enabled.
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("httpcore").setLevel(logging.WARNING)
-        
+
+        # SNS 增量同步/自动同步是高频后台轮询任务，INFO 级别会持续刷屏，
+        # 与 httpx 一样压到 WARNING；可通过 WECHAT_TOOL_SNS_LOG_LEVEL 恢复。
+        sns_level_name = str(os.environ.get("WECHAT_TOOL_SNS_LOG_LEVEL", "WARNING") or "WARNING").strip().upper()
+        sns_level = getattr(logging, sns_level_name, logging.WARNING)
+        for _sns_logger_name in (
+            "wechat_decrypt_tool.routers.sns",
+            "wechat_decrypt_tool.sns_realtime_autosync",
+        ):
+            logging.getLogger(_sns_logger_name).setLevel(sns_level)
+
         # 配置根日志器
         root_logger.setLevel(level)
         root_logger.addHandler(file_handler)

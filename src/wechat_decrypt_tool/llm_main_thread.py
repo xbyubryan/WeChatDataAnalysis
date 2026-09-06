@@ -3,11 +3,17 @@
 设计要点：
 - 走 OpenAI 兼容协议（/chat/completions），默认 OpenRouter，可换任何兼容端点。
 - 配置全部来自环境变量，不落盘、不进 git：
-    WECHAT_TOOL_LLM_BASE_URL  默认 https://openrouter.ai/api/v1
+    WECHAT_TOOL_LLM_BASE_URL  默认按 key 来源推断（见下）
     WECHAT_TOOL_LLM_API_KEY   必填（未配置时调用方回退规则式主线）
-    WECHAT_TOOL_LLM_MODEL     默认 deepseek/deepseek-chat
+    WECHAT_TOOL_LLM_MODEL     默认按 key 来源推断（见下）
     WECHAT_TOOL_LLM_TIMEOUT   默认 60 秒
     WECHAT_TOOL_LLM_MAX_MEMBERS 默认 20（每群最多为前 N 名成员生成）
+- 除专用变量外，还兼容业界惯用的 key 变量名（按优先级）：
+    WECHAT_TOOL_LLM_API_KEY > DEEPSEEK_API_KEY > OPENROUTER_API_KEY > OPENAI_API_KEY
+  未显式设置 BASE_URL / MODEL 时按实际生效的 key 来源推断：
+    deepseek   -> https://api.deepseek.com/v1 + deepseek-chat
+    openrouter -> https://openrouter.ai/api/v1 + deepseek/deepseek-chat
+    openai     -> https://api.openai.com/v1 + gpt-4o-mini
 - 每个群一次批量调用：把 Top N 成员的统计 + 最近发言样本打包进一个 prompt，
   要求模型按 wxid 返回 JSON，避免逐成员调用造成的成本与延迟爆炸。
 - 结果按"输入内容 hash"做磁盘缓存：成员统计或样本变化会自动换 key，
@@ -36,6 +42,14 @@ _DEFAULT_MODEL = "deepseek/deepseek-chat"
 _DEFAULT_TIMEOUT = 60.0
 _DEFAULT_MAX_MEMBERS = 20
 
+# 兼容的 key 环境变量（按优先级）及其默认端点/模型。
+_KEY_ENV_PRESETS: tuple[tuple[str, str, str], ...] = (
+    ("WECHAT_TOOL_LLM_API_KEY", "", ""),  # 专用变量：端点/模型用全局默认
+    ("DEEPSEEK_API_KEY", "https://api.deepseek.com/v1", "deepseek-chat"),
+    ("OPENROUTER_API_KEY", "https://openrouter.ai/api/v1", "deepseek/deepseek-chat"),
+    ("OPENAI_API_KEY", "https://api.openai.com/v1", "gpt-4o-mini"),
+)
+
 _MAX_SAMPLES_PER_MEMBER = 8
 _SAMPLE_CHARS = 60
 _LINE_MAX_CHARS = 60
@@ -61,9 +75,27 @@ def load_llm_config(env: Optional[dict[str, str]] = None) -> LLMConfig:
     """从环境变量加载配置；测试时可注入 dict。"""
 
     src = env if env is not None else os.environ
-    base_url = str(src.get("WECHAT_TOOL_LLM_BASE_URL") or _DEFAULT_BASE_URL).strip().rstrip("/")
-    api_key = str(src.get("WECHAT_TOOL_LLM_API_KEY") or "").strip()
-    model = str(src.get("WECHAT_TOOL_LLM_MODEL") or _DEFAULT_MODEL).strip()
+
+    # 按优先级找第一个非空的 key 变量，并记录来源以便推断默认端点/模型
+    api_key = ""
+    key_source = ""
+    for env_name, _preset_url, _preset_model in _KEY_ENV_PRESETS:
+        value = str(src.get(env_name) or "").strip()
+        if value:
+            api_key = value
+            key_source = env_name
+            break
+
+    preset_url = _DEFAULT_BASE_URL
+    preset_model = _DEFAULT_MODEL
+    for env_name, p_url, p_model in _KEY_ENV_PRESETS:
+        if env_name == key_source and p_url:
+            preset_url = p_url
+            preset_model = p_model
+            break
+
+    base_url = str(src.get("WECHAT_TOOL_LLM_BASE_URL") or preset_url).strip().rstrip("/")
+    model = str(src.get("WECHAT_TOOL_LLM_MODEL") or preset_model).strip()
     try:
         timeout = float(src.get("WECHAT_TOOL_LLM_TIMEOUT") or _DEFAULT_TIMEOUT)
     except (TypeError, ValueError):
