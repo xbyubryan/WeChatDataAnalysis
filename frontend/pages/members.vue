@@ -101,7 +101,7 @@
               type="button"
               class="rounded-md border border-[#e5e7eb] px-3 py-1.5 text-[12px] text-[#374151] transition hover:border-[#07C160] hover:text-[#07C160] disabled:opacity-60"
               :disabled="loading"
-              @click="loadOverview({ force: true })"
+              @click="handleRefresh"
             >
               {{ loading ? '统计中…' : '重新统计' }}
             </button>
@@ -138,6 +138,79 @@
         </div>
 
         <ErrorNotice v-else-if="error" :message="error" />
+
+        <!-- AI 群聊总结报告 -->
+        <div v-if="selectedUsername && aiMainThread && (summaryLoading || summary)" class="mb-4 overflow-hidden rounded-lg border border-[#e5e7eb] bg-white">
+          <div class="flex items-center justify-between border-b border-[#e5e7eb] px-4 py-3">
+            <div class="flex items-center gap-2">
+              <span class="rounded bg-[#f0fdf4] px-1.5 py-0.5 text-[10px] font-medium text-[#047857]">AI</span>
+              <span class="text-[14px] font-medium text-[#111827]">群聊总结报告</span>
+            </div>
+            <div v-if="summaryNotice" class="text-[11px]" :class="summary?.llm?.error ? 'text-amber-600' : 'text-[#9ca3af]'">{{ summaryNotice }}</div>
+          </div>
+
+          <div v-if="summaryLoading" class="px-4 py-10 text-center text-[13px] text-[#6b7280]">
+            正在生成群聊总结报告，首次生成约需 10~30 秒…
+          </div>
+
+          <template v-else-if="summaryReport">
+            <div class="border-b border-[#f3f4f6] px-5 py-4">
+              <div class="text-[16px] font-semibold leading-snug text-[#111827]">{{ summaryReport.headline }}</div>
+              <p v-if="summaryReport.overview" class="mt-2 text-[13px] leading-relaxed text-[#374151]">{{ summaryReport.overview }}</p>
+            </div>
+
+            <div class="grid md:grid-cols-2">
+              <div v-if="summaryReport.topics?.length" class="border-b border-[#f3f4f6] px-5 py-4 md:border-r">
+                <div class="text-[12px] font-medium text-[#6b7280]">主要话题</div>
+                <div v-for="(topic, ti) in summaryReport.topics" :key="ti" class="mt-3">
+                  <div class="flex items-center gap-1.5 text-[13px] font-medium text-[#111827]">
+                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-[#07C160]"></span>{{ topic.title }}
+                  </div>
+                  <p class="mt-1 pl-3 text-[12px] leading-relaxed text-[#4b5563]">{{ topic.summary }}</p>
+                </div>
+              </div>
+
+              <div v-if="summaryReport.timeline?.length" class="border-b border-[#f3f4f6] px-5 py-4">
+                <div class="text-[12px] font-medium text-[#6b7280]">时间线</div>
+                <div v-for="(seg, si) in summaryReport.timeline" :key="si" class="mt-3 flex items-start gap-2.5">
+                  <span class="shrink-0 rounded bg-[#f0fdf4] px-1.5 py-0.5 text-[11px] font-medium text-[#047857]">{{ seg.period }}</span>
+                  <ul class="min-w-0">
+                    <li v-for="(point, pi) in seg.points" :key="pi" class="text-[12px] leading-relaxed text-[#4b5563]">· {{ point }}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="summaryReport.highlights?.length" class="border-b border-[#f3f4f6] px-5 py-4">
+              <div class="text-[12px] font-medium text-[#6b7280]">值得关注的原话</div>
+              <div v-for="(h, hi) in summaryReport.highlights" :key="hi" class="mt-2 rounded-md bg-[#f9fafb] px-3 py-2">
+                <div class="text-[12px] leading-relaxed text-[#111827]">"{{ h.text }}"</div>
+                <div class="mt-1 text-[11px] text-[#9ca3af]">
+                  —— {{ h.sender || '未知' }}<span v-if="h.reason" class="ml-2 text-[#047857]">{{ h.reason }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="summaryTopMembers.length" class="px-5 py-4">
+              <div class="text-[12px] font-medium text-[#6b7280]">活跃成员 Top {{ summaryTopMembers.length }}</div>
+              <div class="mt-2.5 flex flex-wrap gap-2">
+                <div
+                  v-for="(m, mi) in summaryTopMembers"
+                  :key="m.wxid || mi"
+                  class="flex items-center gap-2 rounded-full border border-[#e5e7eb] px-3 py-1.5"
+                >
+                  <span class="text-[11px] tabular-nums text-[#9ca3af]">{{ mi + 1 }}</span>
+                  <span class="text-[12px] font-medium text-[#111827]">{{ m.displayName || m.wxid }}</span>
+                  <span class="text-[11px] tabular-nums text-[#6b7280]">{{ formatNumber(m.messageCount) }} 条 · {{ m.share }}%</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div v-else class="px-4 py-6 text-center text-[13px] text-[#6b7280]">
+            {{ summary?.llm?.error || '总结报告生成失败，请稍后重试' }}
+          </div>
+        </div>
 
         <div v-if="selectedUsername" class="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white">
           <div class="flex items-center justify-between border-b border-[#e5e7eb] px-4 py-3">
@@ -244,10 +317,22 @@ const loading = ref(false)
 const error = ref('')
 const topicCount = ref(8)
 const aiMainThread = ref(false)
+const summary = ref(null)
+const summaryLoading = ref(false)
 let requestId = 0
+let summaryRequestId = 0
 
 const members = computed(() => (overview.value && Array.isArray(overview.value.members) ? overview.value.members : []))
 const totals = computed(() => (overview.value && overview.value.totals) || { members: 0, messages: 0 })
+const summaryReport = computed(() => (summary.value && summary.value.report) || null)
+const summaryTopMembers = computed(() => (Array.isArray(summary.value?.topMembers) ? summary.value.topMembers : []))
+const summaryNotice = computed(() => {
+  const llm = summary.value && summary.value.llm
+  if (!llm) return ''
+  if (llm.error) return String(llm.error)
+  if (!llm.configured) return ''
+  return `${llm.model || 'LLM'} 生成${llm.cached ? '（缓存）' : ''}`
+})
 const llmNotice = computed(() => {
   const meta = overview.value && overview.value.llm
   if (!meta) return ''
@@ -349,7 +434,9 @@ const selectSession = (username) => {
   const next = String(username || '').trim()
   if (!next || next === selectedUsername.value) return
   selectedUsername.value = next
+  summary.value = null
   loadOverview()
+  if (aiMainThread.value) loadGroupSummary()
 }
 
 const loadSessions = async () => {
@@ -400,10 +487,35 @@ const loadOverview = async (options = {}) => {
   }
 }
 
+const loadGroupSummary = async () => {
+  if (!selectedUsername.value) return
+  const traceId = ++summaryRequestId
+  summaryLoading.value = true
+  try {
+    const data = await api.getChatGroupSummary({
+      username: selectedUsername.value,
+      account: selectedAccount.value || null,
+    })
+    if (traceId !== summaryRequestId) return
+    summary.value = data && typeof data === 'object' ? data : null
+  } catch (e) {
+    if (traceId !== summaryRequestId) return
+    summary.value = { report: null, llm: { configured: false, error: String(e?.message || '群聊总结加载失败') } }
+  } finally {
+    if (traceId === summaryRequestId) summaryLoading.value = false
+  }
+}
+
+const handleRefresh = () => {
+  loadOverview({ force: true })
+  if (aiMainThread.value) loadGroupSummary()
+}
+
 watch(selectedAccount, () => {
   sessions.value = []
   selectedUsername.value = ''
   overview.value = null
+  summary.value = null
   loadSessions()
 })
 
@@ -411,8 +523,11 @@ watch(topicCount, () => {
   if (selectedUsername.value) loadOverview()
 })
 
-watch(aiMainThread, () => {
-  if (selectedUsername.value) loadOverview()
+watch(aiMainThread, (enabled) => {
+  summary.value = null
+  if (!selectedUsername.value) return
+  loadOverview()
+  if (enabled) loadGroupSummary()
 })
 
 onMounted(() => {

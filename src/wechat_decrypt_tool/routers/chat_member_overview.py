@@ -44,6 +44,10 @@ from ..llm_main_thread import (
     generate_main_threads,
     load_llm_config,
 )
+from ..llm_group_summary import (
+    _CACHE_DIR_NAME as _SUMMARY_CACHE_DIR_NAME,
+    generate_group_summary,
+)
 from ..logging_config import get_logger
 from ..path_fix import PathFixRoute
 
@@ -700,7 +704,7 @@ def _apply_llm_main_threads(
         payload["mainThreadMode"] = "rule"
         payload["llm"] = {
             "configured": False,
-            "error": "未配置 WECHAT_TOOL_LLM_API_KEY，已回退规则式主线",
+            "error": "未配置 LLM API key（支持 WECHAT_TOOL_LLM_API_KEY / DEEPSEEK_API_KEY / OPENROUTER_API_KEY / OPENAI_API_KEY），已回退规则式主线",
         }
         return payload
 
@@ -809,6 +813,244 @@ def build_member_overview(
 
 
 # --------------------------------------------------------------------------- #
+# LLM 群总结报告（v2 整群版）
+# --------------------------------------------------------------------------- #
+
+_SUMMARY_SAMPLE_LIMIT = 240  # 送进 prompt 的最近消息条数上限
+
+
+def _collect_group_messages(
+    conn: sqlite3.Connection,
+    *,
+    username: str,
+    start_ts: Optional[int],
+    end_ts: Optional[int],
+    include_hidden: bool,
+    include_official: bool,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """按时间正序采样群内文本消息：[{ts, sender, text, senderDisplayName}]。"""
+
+    where = ["m.username = ?", "m.sender_username <> ''"]
+    params: list[Any] = [username]
+
+    if not include_hidden:
+        where.append("CAST(m.is_hidden AS INTEGER) = 0")
+    if not include_official:
+        where.append("CAST(m.is_official AS INTEGER) = 0")
+    if start_ts is not None:
+        where.append("CAST(m.create_time AS INTEGER) >= ?")
+        params.append(int(start_ts))
+    if end_ts is not None:
+        where.append("CAST(m.create_time AS INTEGER) <= ?")
+        params.append(int(end_ts))
+
+    sql = (
+        "SELECT CAST(m.create_time AS INTEGER) AS ts, m.sender_username AS sender, "
+        "f.payload_json AS pj "
+        "FROM message_meta m "
+        "JOIN message_fts f ON f.rowid = m.rowid "
+        f"WHERE {' AND '.join(where)} "
+        "ORDER BY ts DESC "
+        "LIMIT ?"
+    )
+    params.append(int(limit))
+
+    rows = list(conn.execute(sql, params))
+    rows.reverse()  # 恢复时间正序
+
+    messages: list[dict[str, Any]] = []
+    for r in rows:
+        raw = r["pj"]
+        if not raw:
+            continue
+        try:
+            obj = json.loads(raw) if isinstance(raw, (str, bytes)) else raw
+        except Exception:
+            continue
+        text = _payload_text(obj)
+        if not text:
+            continue
+        display = ""
+        if isinstance(obj, dict):
+            display = str(obj.get("senderDisplayName") or "").strip()
+        messages.append(
+            {
+                "ts": int(r["ts"] or 0),
+                "sender": str(r["sender"] or "").strip(),
+                "senderDisplayName": display,
+                "text": text,
+            }
+        )
+    return messages
+
+
+def build_group_summary(
+    *,
+    account: Optional[str] = None,
+    username: str = "",
+    start_time: Optional[int] = None,
+    end_time: Optional[int] = None,
+    max_messages: int = _SUMMARY_SAMPLE_LIMIT,
+    include_hidden: bool = False,
+    include_official: bool = False,
+) -> dict[str, Any]:
+    """生成整群 LLM 总结报告（headline/overview/topics/timeline/highlights）。
+
+    成员统计复用规则式总览（带缓存，成本低）；LLM 部分独立内容 hash 缓存。
+    未配置 key 或调用失败时 report 为 None，错误放在 llm.error。
+    """
+
+    username = str(username or "").strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="username is required.")
+
+    max_messages = max(20, min(500, int(max_messages)))
+    start_ts = int(start_time) if start_time is not None else None
+    end_ts = int(end_time) if end_time is not None else None
+
+    account_dir = _resolve_account_dir(account)
+    contact_db_path = account_dir / "contact.db"
+
+    # 1) 成员统计（复用规则式总览，命中缓存时几乎零成本）
+    overview = _build_member_overview_base(
+        account=account,
+        username=username,
+        start_time=start_time,
+        end_time=end_time,
+        topics=0,
+        include_hidden=include_hidden,
+        include_official=include_official,
+        refresh=False,
+    )
+
+    base_payload: dict[str, Any] = {
+        "account": account_dir.name,
+        "username": username,
+        "isGroup": username.endswith("@chatroom"),
+        "index": overview.get("index"),
+        "status": overview.get("status"),
+        "range": overview.get("range"),
+        "totals": overview.get("totals"),
+        "topMembers": [
+            {
+                "wxid": m.get("wxid"),
+                "displayName": m.get("displayName"),
+                "messageCount": m.get("messageCount"),
+                "share": m.get("share"),
+            }
+            for m in (overview.get("members") or [])[:10]
+        ],
+        "report": None,
+        "llm": {"configured": False, "model": "", "cached": False, "error": None},
+    }
+
+    if overview.get("status") != "success":
+        return base_payload
+
+    # 群名
+    group_name = ""
+    try:
+        rows = _load_contact_rows(contact_db_path, [username])
+        crow = rows.get(username)
+        if crow is not None:
+            group_name = _pick_display_name(crow, "")
+    except Exception:
+        group_name = ""
+    base_payload["groupName"] = group_name or username
+
+    # 2) 采样消息并解析发送者显示名
+    index_db_path = get_chat_search_index_db_path(account_dir)
+    conn = sqlite3.connect(str(index_db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        raw_messages = _collect_group_messages(
+            conn,
+            username=username,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            include_hidden=include_hidden,
+            include_official=include_official,
+            limit=max_messages,
+        )
+    except sqlite3.Error as e:
+        conn.close()
+        logger.error("[group-summary] sample failed username=%s error=%s", username, str(e))
+        raise HTTPException(status_code=500, detail="Failed to sample group messages.") from e
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    senders = sorted({m["sender"] for m in raw_messages if m["sender"]})
+    name_map: dict[str, str] = {}
+    if senders:
+        try:
+            contact_rows = _load_contact_rows(contact_db_path, senders)
+            group_nicknames: dict[str, str] = {}
+            if username.endswith("@chatroom"):
+                try:
+                    group_nicknames = _load_group_nickname_map_from_contact_db(
+                        contact_db_path, username, senders
+                    )
+                except Exception:
+                    group_nicknames = {}
+            for s in senders:
+                name = str(group_nicknames.get(s) or "").strip()
+                if not name:
+                    crow = contact_rows.get(s)
+                    if crow is not None:
+                        name = _pick_display_name(crow, "")
+                if name:
+                    name_map[s] = name
+        except Exception:
+            name_map = {}
+
+    prompt_messages: list[dict[str, Any]] = []
+    for m in raw_messages:
+        sender = m["sender"]
+        display = name_map.get(sender) or m.get("senderDisplayName") or sender
+        ts_label = time.strftime("%m-%d %H:%M", time.localtime(m["ts"])) if m["ts"] else ""
+        prompt_messages.append({"ts_label": ts_label, "sender": display, "text": m["text"][:100]})
+
+    # 3) 调 LLM 生成报告
+    config = load_llm_config()
+    base_payload["llm"]["configured"] = config.enabled
+    base_payload["llm"]["model"] = config.model
+
+    if not config.enabled:
+        base_payload["llm"]["error"] = (
+            "未配置 LLM API key（支持 WECHAT_TOOL_LLM_API_KEY / DEEPSEEK_API_KEY / "
+            "OPENROUTER_API_KEY / OPENAI_API_KEY），仅返回成员统计"
+        )
+        return base_payload
+
+    if not group_name:
+        group_name = username
+
+    totals = overview.get("totals") or {}
+    cache_dir = account_dir / _OVERVIEW_DIR_NAME / _SUMMARY_CACHE_DIR_NAME
+    result = generate_group_summary(
+        messages=prompt_messages,
+        group_name=group_name,
+        member_count=int(totals.get("members") or 0),
+        message_total=int(totals.get("messages") or 0),
+        top_members=[
+            {"name": m.get("displayName"), "count": m.get("messageCount")}
+            for m in (overview.get("members") or [])[:5]
+        ],
+        config=config,
+        cache_dir=cache_dir,
+    )
+
+    base_payload["report"] = result.get("report")
+    base_payload["llm"]["cached"] = bool(result.get("cached"))
+    base_payload["llm"]["error"] = result.get("error")
+    return base_payload
+
+
+# --------------------------------------------------------------------------- #
 # 路由
 # --------------------------------------------------------------------------- #
 
@@ -839,4 +1081,25 @@ def get_member_overview(
         include_official=include_official,
         refresh=refresh,
         main_thread=main_thread,
+    )
+
+
+@router.get("/api/chat/group-summary", summary="群聊 LLM 总结报告（定调 / 摘要 / 话题 / 时间线 / 高价值消息）")
+def get_group_summary(
+    username: str = Query(..., description="会话 username（群聊为 xxx@chatroom）。"),
+    account: Optional[str] = Query(None, description="解密后的账号目录名。默认取第一个可用账号。"),
+    start_time: Optional[int] = Query(None, description="起始时间（Unix 秒）。"),
+    end_time: Optional[int] = Query(None, description="结束时间（Unix 秒）。"),
+    max_messages: int = Query(240, description="送进模型的最近消息条数上限。", ge=20, le=500),
+    include_hidden: bool = Query(False, description="包含隐藏会话的消息。"),
+    include_official: bool = Query(False, description="包含公众号会话的消息。"),
+):
+    return build_group_summary(
+        account=account,
+        username=username,
+        start_time=start_time,
+        end_time=end_time,
+        max_messages=max_messages,
+        include_hidden=include_hidden,
+        include_official=include_official,
     )

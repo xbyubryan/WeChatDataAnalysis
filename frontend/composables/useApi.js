@@ -778,6 +778,17 @@ export const useApi = () => {
     return await request(url, params?.signal ? { signal: params.signal } : {})
   }
 
+  const getChatGroupSummary = async (params = {}) => {
+    const query = new URLSearchParams()
+    if (params && params.username) query.set('username', String(params.username))
+    if (params && params.account) query.set('account', String(params.account))
+    if (params && params.start_time != null) query.set('start_time', String(params.start_time))
+    if (params && params.end_time != null) query.set('end_time', String(params.end_time))
+    if (params && params.max_messages != null) query.set('max_messages', String(params.max_messages))
+    const url = '/chat/group-summary' + (query.toString() ? `?${query.toString()}` : '')
+    return await request(url, params?.signal ? { signal: params.signal } : {})
+  }
+
   // 联系人
   const listChatContacts = async (params = {}) => {
     const query = new URLSearchParams()
@@ -1192,6 +1203,7 @@ export const useApi = () => {
     listChatContacts,
     getChatContactProfile,
     getChatMemberOverview,
+    getChatGroupSummary,
     exportChatContacts,
     createAccountArchiveExport,
     getAccountArchiveExport,
