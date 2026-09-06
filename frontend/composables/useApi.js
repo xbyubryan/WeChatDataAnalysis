@@ -773,6 +773,7 @@ export const useApi = () => {
     if (params && params.include_hidden != null) query.set('include_hidden', String(!!params.include_hidden))
     if (params && params.include_official != null) query.set('include_official', String(!!params.include_official))
     if (params && params.refresh != null) query.set('refresh', String(!!params.refresh))
+    if (params && params.main_thread) query.set('main_thread', String(params.main_thread))
     const url = '/chat/member-overview' + (query.toString() ? `?${query.toString()}` : '')
     return await request(url, params?.signal ? { signal: params.signal } : {})
   }

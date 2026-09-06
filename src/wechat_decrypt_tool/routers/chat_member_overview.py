@@ -39,6 +39,11 @@ from ..chat_search_index import (
     get_chat_search_index_status,
     start_chat_search_index_build,
 )
+from ..llm_main_thread import (
+    _CACHE_DIR_NAME as _LLM_CACHE_DIR_NAME,
+    generate_main_threads,
+    load_llm_config,
+)
 from ..logging_config import get_logger
 from ..path_fix import PathFixRoute
 
@@ -234,8 +239,8 @@ def _build_main_thread(
 ) -> str:
     """规则式一句话主线。
 
-    v1 不接 LLM：用"活跃档位 + 高频主题词 + 最近发言时间"拼一句可读的摘要，
-    避免把聊天原文外发给任何在线模型。
+    v1 规则式：用"活跃档位 + 高频主题词 + 最近发言时间"拼一句可读的摘要，
+    纯本地、不外发任何内容。LLM 版本见 llm_main_thread.py（main_thread=llm）。
     """
 
     level = _activity_level(share_pct, member_count)
@@ -438,7 +443,7 @@ def _sample_texts(
     return texts, display_fallback
 
 
-def build_member_overview(
+def _build_member_overview_base(
     *,
     account: Optional[str] = None,
     username: str = "",
@@ -449,7 +454,7 @@ def build_member_overview(
     include_official: bool = False,
     refresh: bool = False,
 ) -> dict[str, Any]:
-    """计算某个会话的成员发言总览。"""
+    """计算某个会话的成员发言总览（规则式主线，结果落盘缓存）。"""
 
     username = str(username or "").strip()
     if not username:
@@ -659,6 +664,151 @@ def build_member_overview(
 
 
 # --------------------------------------------------------------------------- #
+# LLM 主线增强（v2）
+# --------------------------------------------------------------------------- #
+
+_LLM_SAMPLE_LIMIT = 12
+
+
+def _apply_llm_main_threads(
+    *,
+    account_dir: Path,
+    username: str,
+    payload: dict[str, Any],
+    start_ts: Optional[int],
+    end_ts: Optional[int],
+    include_hidden: bool,
+    include_official: bool,
+) -> dict[str, Any]:
+    """在规则式总览之上，用 LLM 为 Top N 成员重写 mainThread。
+
+    任何失败都安静回退：成员保持规则式主线，meta 里记录 error。
+    规则式缓存不受污染（LLM 结果有自己的内容 hash 缓存）。
+    """
+
+    members = payload.get("members") or []
+    config = load_llm_config()
+
+    for m in members:
+        m.setdefault("mainThreadSource", "rule")
+
+    if not isinstance(members, list) or not members:
+        payload["mainThreadMode"] = "rule"
+        return payload
+
+    if not config.enabled:
+        payload["mainThreadMode"] = "rule"
+        payload["llm"] = {
+            "configured": False,
+            "error": "未配置 WECHAT_TOOL_LLM_API_KEY，已回退规则式主线",
+        }
+        return payload
+
+    targets = members[: config.max_members]
+
+    samples_by_wxid: dict[str, list[str]] = {}
+    index_db_path = get_chat_search_index_db_path(account_dir)
+    conn = sqlite3.connect(str(index_db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        for m in targets:
+            wxid = str(m.get("wxid") or "")
+            if not wxid:
+                continue
+            texts, _ = _sample_texts(
+                conn,
+                username=username,
+                sender=wxid,
+                start_ts=start_ts,
+                end_ts=end_ts,
+                include_hidden=include_hidden,
+                include_official=include_official,
+                limit=_LLM_SAMPLE_LIMIT,
+            )
+            samples_by_wxid[wxid] = texts
+    except sqlite3.Error as e:
+        logger.warning("[member-overview] llm sampling failed username=%s error=%s", username, str(e))
+    finally:
+        conn.close()
+
+    llm_cache_dir = account_dir / _OVERVIEW_DIR_NAME / _LLM_CACHE_DIR_NAME
+    gen = generate_main_threads(
+        members=targets,
+        samples_by_wxid=samples_by_wxid,
+        config=config,
+        cache_dir=llm_cache_dir,
+    )
+
+    lines: dict[str, str] = gen.get("lines") or {}
+    applied = 0
+    for m in members:
+        wxid = str(m.get("wxid") or "")
+        line = lines.get(wxid)
+        if line:
+            m["mainThread"] = line
+            m["mainThreadSource"] = "llm"
+            applied += 1
+
+    payload["mainThreadMode"] = "llm" if applied else "rule"
+    payload["llm"] = {
+        "configured": True,
+        "model": gen.get("model"),
+        "requested": len(targets),
+        "generated": applied,
+        "cached": bool(gen.get("cached")),
+        "error": gen.get("error"),
+    }
+    return payload
+
+
+def build_member_overview(
+    *,
+    account: Optional[str] = None,
+    username: str = "",
+    start_time: Optional[int] = None,
+    end_time: Optional[int] = None,
+    topics: int = _DEFAULT_TOPIC_COUNT,
+    include_hidden: bool = False,
+    include_official: bool = False,
+    refresh: bool = False,
+    main_thread: str = "rule",
+) -> dict[str, Any]:
+    """计算某个会话的成员发言总览。
+
+    main_thread="rule" 走规则式主线（默认，纯本地）；
+    main_thread="llm"  在规则式结果之上用 LLM 重写 Top N 成员主线（opt-in，
+                       会把成员显示名/统计/最近发言截断样本发到配置的模型端点）。
+    """
+
+    payload = _build_member_overview_base(
+        account=account,
+        username=username,
+        start_time=start_time,
+        end_time=end_time,
+        topics=topics,
+        include_hidden=include_hidden,
+        include_official=include_official,
+        refresh=refresh,
+    )
+
+    if str(main_thread).lower() != "llm":
+        return payload
+    if payload.get("status") != "success" or not payload.get("members"):
+        return payload
+
+    account_dir = _resolve_account_dir(account)
+    return _apply_llm_main_threads(
+        account_dir=account_dir,
+        username=username,
+        payload=payload,
+        start_ts=int(start_time) if start_time is not None else None,
+        end_ts=int(end_time) if end_time is not None else None,
+        include_hidden=include_hidden,
+        include_official=include_official,
+    )
+
+
+# --------------------------------------------------------------------------- #
 # 路由
 # --------------------------------------------------------------------------- #
 
@@ -673,6 +823,11 @@ def get_member_overview(
     include_hidden: bool = Query(False, description="包含隐藏会话的消息。"),
     include_official: bool = Query(False, description="包含公众号会话的消息。"),
     refresh: bool = Query(False, description="忽略缓存强制重算。"),
+    main_thread: str = Query(
+        "rule",
+        pattern="^(rule|llm)$",
+        description="主线生成方式：rule=规则式（默认，纯本地）；llm=调用配置的 OpenAI 兼容端点为 Top 成员生成（需 WECHAT_TOOL_LLM_API_KEY）。",
+    ),
 ):
     return build_member_overview(
         account=account,
@@ -683,4 +838,5 @@ def get_member_overview(
         include_hidden=include_hidden,
         include_official=include_official,
         refresh=refresh,
+        main_thread=main_thread,
     )

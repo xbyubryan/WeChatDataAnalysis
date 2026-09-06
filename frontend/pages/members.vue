@@ -87,6 +87,18 @@
             </label>
             <button
               type="button"
+              class="rounded-md border px-3 py-1.5 text-[12px] transition disabled:opacity-60"
+              :class="aiMainThread
+                ? 'border-[#07C160] bg-[#f0fdf4] text-[#047857]'
+                : 'border-[#e5e7eb] text-[#374151] hover:border-[#07C160] hover:text-[#07C160]'"
+              :disabled="loading"
+              :title="aiMainThread ? '已开启：由配置的 LLM 生成主线（会把截断的发言样本发到模型端点）' : '开启后由 LLM 生成主线'"
+              @click="aiMainThread = !aiMainThread"
+            >
+              AI 主线{{ aiMainThread ? '·开' : '' }}
+            </button>
+            <button
+              type="button"
               class="rounded-md border border-[#e5e7eb] px-3 py-1.5 text-[12px] text-[#374151] transition hover:border-[#07C160] hover:text-[#07C160] disabled:opacity-60"
               :disabled="loading"
               @click="loadOverview({ force: true })"
@@ -130,7 +142,10 @@
         <div v-if="selectedUsername" class="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white">
           <div class="flex items-center justify-between border-b border-[#e5e7eb] px-4 py-3">
             <div class="text-[14px] font-medium text-[#111827]">成员总览</div>
-            <div v-if="overview?.freshness?.message" class="text-[11px] text-[#9ca3af]">{{ overview.freshness.message }}</div>
+            <div class="flex items-center gap-3">
+              <div v-if="llmNotice" class="text-[11px]" :class="overview?.llm?.error ? 'text-amber-600' : 'text-[#047857]'">{{ llmNotice }}</div>
+              <div v-if="overview?.freshness?.message" class="text-[11px] text-[#9ca3af]">{{ overview.freshness.message }}</div>
+            </div>
           </div>
 
           <div class="overflow-x-auto">
@@ -187,7 +202,12 @@
                     </div>
                     <span v-else class="text-[12px] text-[#9ca3af]">无有效文本</span>
                   </td>
-                  <td class="px-4 py-3 leading-relaxed text-[#374151]">{{ member.mainThread }}</td>
+                  <td class="px-4 py-3 leading-relaxed text-[#374151]">
+                    <span
+                      v-if="member.mainThreadSource === 'llm'"
+                      class="mr-1.5 rounded-full bg-[#f0fdf4] px-1.5 py-0.5 text-[10px] font-medium text-[#047857]"
+                    >AI</span>{{ member.mainThread }}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -223,10 +243,18 @@ const overview = ref(null)
 const loading = ref(false)
 const error = ref('')
 const topicCount = ref(8)
+const aiMainThread = ref(false)
 let requestId = 0
 
 const members = computed(() => (overview.value && Array.isArray(overview.value.members) ? overview.value.members : []))
 const totals = computed(() => (overview.value && overview.value.totals) || { members: 0, messages: 0 })
+const llmNotice = computed(() => {
+  const meta = overview.value && overview.value.llm
+  if (!meta) return ''
+  if (meta.error) return String(meta.error)
+  if (meta.generated != null) return `AI 主线：${meta.model || 'LLM'} 生成 ${meta.generated} 条${meta.cached ? '（缓存）' : ''}`
+  return ''
+})
 
 const looksLikeRawId = (value) => {
   const text = String(value || '').trim()
@@ -359,6 +387,7 @@ const loadOverview = async (options = {}) => {
       account: selectedAccount.value || null,
       topics: topicCount.value,
       refresh: !!options.force,
+      main_thread: aiMainThread.value ? 'llm' : 'rule',
     })
     if (traceId !== requestId) return
     overview.value = data && typeof data === 'object' ? data : null
@@ -379,6 +408,10 @@ watch(selectedAccount, () => {
 })
 
 watch(topicCount, () => {
+  if (selectedUsername.value) loadOverview()
+})
+
+watch(aiMainThread, () => {
   if (selectedUsername.value) loadOverview()
 })
 
