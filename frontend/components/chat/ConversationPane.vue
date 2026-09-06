@@ -94,6 +94,14 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 14h2m3 0h2m3 0h2M7 18h2m3 0h2" />
             </svg>
           </button>
+          <button v-if="isGroupContact" class="header-btn-icon" @click="openMemberOverview" title="成员发言统计">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+              <circle cx="10" cy="7" r="4" stroke-width="1.8" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </button>
           <select
             v-model="messageTypeFilter"
             class="message-filter-select"

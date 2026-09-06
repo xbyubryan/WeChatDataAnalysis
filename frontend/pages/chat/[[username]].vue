@@ -164,6 +164,14 @@ const {
 
 const searchContext = ref(createEmptySearchContext())
 
+// 跳转当前群聊的成员发言总览（/members?username=...）
+const openMemberOverview = async () => {
+  const username = String(selectedContact.value?.username || '').trim()
+  if (!username || !username.endsWith('@chatroom')) return
+  await navigateTo({ path: '/members', query: { username } })
+}
+const isGroupContact = computed(() => String(selectedContact.value?.username || '').endsWith('@chatroom'))
+
 const sessionState = useChatSessions({
   chatAccounts,
   selectedAccount,
@@ -1239,6 +1247,8 @@ const chatState = {
   toggleResourceSidebar: toggleChatResourceSidebar,
   toggleMessageSearch: toggleChatMessageSearch,
   openMessageSearch: openChatMessageSearch,
-  toggleTimeSidebar: toggleChatTimeSidebar
+  toggleTimeSidebar: toggleChatTimeSidebar,
+  openMemberOverview,
+  isGroupContact
 }
 </script>

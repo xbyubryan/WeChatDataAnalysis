@@ -206,6 +206,7 @@ import { usePrivacyStore } from '~/stores/privacy'
 useHead({ title: '成员发言统计 - 微信数据分析助手' })
 
 const api = useApi()
+const route = useRoute()
 const chatAccounts = useChatAccountsStore()
 const { selectedAccount } = storeToRefs(chatAccounts)
 const privacyStore = usePrivacyStore()
@@ -331,8 +332,12 @@ const loadSessions = async () => {
     const list = Array.isArray(data?.sessions) ? data.sessions : Array.isArray(data?.items) ? data.items : []
     sessions.value = list
     if (!selectedUsername.value) {
-      const firstGroup = list.find(isGroupSession)
-      selectedUsername.value = String(firstGroup?.username || list[0]?.username || '').trim()
+      // 从群聊工具栏跳转进来时带 ?username=，优先预选该会话
+      const fromQuery = String(route.query.username || '').trim()
+      const hit = fromQuery ? list.find((item) => String(item?.username || '').trim() === fromQuery) : null
+      const fallback = list.find(isGroupSession)
+      // query 指定的会话即使不在列表前 500 条里也直接选中
+      selectedUsername.value = String(hit?.username || fromQuery || (fallback || list[0])?.username || '').trim()
       if (selectedUsername.value) await loadOverview()
     }
   } catch (e) {
