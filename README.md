@@ -5,16 +5,9 @@
 <div align="center">
     <h1>WeChatDataAnalysis - 微信数据库解密与分析工具</h1>
     <p>微信4.x数据解密并生成年度总结，高仿微信，支持实时更新，导出聊天记录，朋友圈等大量便捷功能</p>
-    <p>如需定制功能，请联系 QQ：3434549571。</p>
-    <img src="https://img.shields.io/github/v/tag/LifeArchiveProject/WeChatDataAnalysis" alt="Version" />
-    <img src="https://img.shields.io/github/stars/LifeArchiveProject/WeChatDataAnalysis" alt="Stars" />
-    <img src="https://gh-down-badges.linkof.link/LifeArchiveProject/WeChatDataAnalysis" alt="Downloads" />
-    <img src="https://img.shields.io/github/forks/LifeArchiveProject/WeChatDataAnalysis" alt="Forks" />
-    <a href="https://qm.qq.com/q/VQEQ7PcGkk"><img src="https://img.shields.io/badge/QQ Group-WeChatDataAnalysis-12B7F5?logo=tencentqq&logoColor=white" alt="QQ Group" /></a>
     <img src="https://img.shields.io/badge/Python-3776AB?logo=Python&logoColor=white" alt="Python" />
     <img src="https://img.shields.io/badge/Vue.js-4FC08D?logo=Vue.js&logoColor=white" alt="Vue.js" />
     <img src="https://img.shields.io/badge/SQLite-003B57?logo=SQLite&logoColor=white" alt="SQLite" />
-    <p>如果你需要 QQ 侧的数据解密、分析或年度总结类工具，欢迎体验 <a href="https://github.com/H3CoF6/WeQ">H3CoF6/WeQ</a>；WeQ 作者也是本项目开发成员之一</p>
 </div>
 
 ## 年度总结
@@ -98,8 +91,6 @@
 
 常规版聚焦于**解密、读取、导出与年度总结**等只读能力；**高级版**在此基础上解锁一整套**写入、动作与实时提醒**能力，覆盖消息修改、消息补录、微信动作、朋友圈互动、群聊管理、联系人管理与关键词提醒。当前公开版本仅展示这些功能入口，实际执行需要高级版。
 
-> **获取方式**：请联系 QQ **3434549571**（备注「高级版」）即可获取。
-
 | 模块 | 高级版功能 |
 | --- | --- |
 | 消息修改 | 修改文字消息、编辑消息源码、修改时间、字段编辑、恢复原消息、修复为我发送、反转微信气泡位置、删除系统消息 |
@@ -129,21 +120,11 @@
 
 > Excel 格式生成 `.xlsx` 文件；聊天记录、朋友圈和收藏会将对应格式文件与必要资源一起打包为 ZIP。
 
-## 加入群聊
-
-也欢迎加入下方 QQ 群一起讨论。
-
-<p align="center">
-    <a href="https://qm.qq.com/q/VQEQ7PcGkk">
-        <img src="frontend/public/QQImage_1770190010691_1103312318341691201.jpg" alt="WeChatDataAnalysis 加群二维码" width="360" />
-    </a>
-</p>
-
 ## 快速开始
 
 ### 1. 下载桌面安装包（推荐）
 
-1. 打开 Release 页面（最新版）：https://github.com/LifeArchiveProject/WeChatDataAnalysis/releases/latest
+1. 打开 Release 页面（最新版）：https://github.com/xbyubryan/WeChatDataAnalysis/releases/latest
 2. Windows 下载 `Setup.exe`；macOS 15+ 的 Apple Silicon Mac 下载 `.dmg` 或 `mac.zip`
 3. 安装完成后启动 `WeChatDataAnalysis`
 
@@ -155,7 +136,7 @@
 #### 2.1 克隆项目
 
 ```bash
-git clone https://github.com/LifeArchiveProject/WeChatDataAnalysis.git
+git clone https://github.com/xbyubryan/WeChatDataAnalysis.git
 cd WeChatDataAnalysis
 ```
 
@@ -284,16 +265,15 @@ npm run dist:mac
 
 ## 致谢
 
-1. **[H3CoF6](https://github.com/H3CoF6)**
-2. **[echotrace](https://github.com/ycccccccy/echotrace)**
-3. **[WeFlow](https://github.com/hicccc77/WeFlow)**
-4. **[wx_key](https://github.com/ycccccccy/wx_key)**
-5. **[wechat-dump-rs](https://github.com/0xlane/wechat-dump-rs)**
-6. **[oh-my-wechat](https://github.com/chclt/oh-my-wechat)**
-7. **[vue3-wechat-tool](https://github.com/Ele-Cat/vue3-wechat-tool)**
-8. **[wx-dat](https://github.com/waaaaashi/wx-dat)**
-9. **[Ritsu](https://xhslink.com/m/7YJUsd1sgyF)**
-10. **[recarto404](https://github.com/recarto404)**
+1. **[echotrace](https://github.com/ycccccccy/echotrace)**
+2. **[WeFlow](https://github.com/hicccc77/WeFlow)**
+3. **[wx_key](https://github.com/ycccccccy/wx_key)**
+4. **[wechat-dump-rs](https://github.com/0xlane/wechat-dump-rs)**
+5. **[oh-my-wechat](https://github.com/chclt/oh-my-wechat)**
+6. **[vue3-wechat-tool](https://github.com/Ele-Cat/vue3-wechat-tool)**
+7. **[wx-dat](https://github.com/waaaaashi/wx-dat)**
+8. **[Ritsu](https://xhslink.com/m/7YJUsd1sgyF)**
+9. **[recarto404](https://github.com/recarto404)**
 
 ## 贡献
 

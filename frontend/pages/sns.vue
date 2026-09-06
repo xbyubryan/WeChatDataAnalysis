@@ -1121,9 +1121,9 @@
     <GuideDialog
       :open="publishUnavailableDialogOpen"
       eyebrow="功能暂未开放"
-      title="请添加 QQ 联系开发者"
+      title="功能暂未开放"
       :description="FEATURE_UNAVAILABLE_MESSAGE"
-      primary-label="添加 QQ 3434549571"
+      primary-label="我知道了"
       secondary-label="关闭"
       tone="warning"
       @primary="contactDeveloper"

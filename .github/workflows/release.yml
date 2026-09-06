@@ -825,24 +825,5 @@ jobs:
             echo "FN_EOF"
           } >> $GITHUB_OUTPUT
 
-      - name: Send QQ notification
-        uses: H3CoF6/qq-notify-action@50d180981e7c7b8552a3331b981e3f8cfcf40c44
-        with:
-          appid: ${{ secrets.QQ_APPID }}
-          secret: ${{ secrets.QQ_SECRET }}
-          group_openid: ${{ secrets.QQ_GROUP_OPENID }}
-          message: |
-            ## WeChatDataAnalysis 新版本 ${{ steps.prep.outputs.version }} 发布
-
-            ==详细更改如下：==
-            ${{ steps.prep.outputs.body }}
-
-            ---
-
-            - Windows 安装包 [下载链接](${{ steps.prep.outputs.exe_url }})
-            - macOS arm64 [下载链接](${{ steps.prep.outputs.mac_arm64_url }})
-
-            欢迎大家使用和测试~
-          file_path: ${{ steps.prep.outputs.file_path_list }}
-          file_type: file
-          file_name: ${{ steps.prep.outputs.file_name_list }}
+      - name: Release notification placeholder
+        run: echo "QQ notification step removed in this fork."

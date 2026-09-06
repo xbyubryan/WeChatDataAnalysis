@@ -23,7 +23,7 @@ jobs:
             -c credential.helper= \
             -c core.askPass= \
             clone --depth 1 \
-            https://github.com/LifeArchiveProject/WeChatDataAnalysis.git \
+            https://github.com/xbyubryan/WeChatDataAnalysis.git \
             "$destination"
           test "$(git -C "$destination" rev-parse HEAD)" = "$EXPECTED_REVISION"
           test -z "$(git -C "$destination" status --porcelain=v1 --untracked-files=all)"

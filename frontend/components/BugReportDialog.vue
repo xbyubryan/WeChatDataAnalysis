@@ -12,10 +12,6 @@
     @close="close"
   >
     <template #title-extra>
-      <button type="button" class="bug-feedback-weq-link" title="打开 WeQ：面向 NTQQ 的本地消息数据库解密、解析与导出工具" @click="openWeqProject">
-        <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
-        <span>本功能的 QQ 在线检测、Hook 注入与闪传能力来自 WeQ。WeQ 是面向 NTQQ 的本地消息数据库解密、解析与导出工具；感谢 H3CoF6 与项目贡献者。</span>
-      </button>
     </template>
     <div class="bug-feedback">
       <div class="bug-feedback-status" :data-state="qqState" role="status">
@@ -143,12 +139,6 @@ const missingFields = computed(() => {
 })
 const sendDisabled = computed(() => loading.value || sending.value || sent.value || !info.value?.qq?.online || !info.value?.projectGroup?.found || !logNames.value.length || missingFields.value.length > 0)
 const sendLabel = computed(() => sending.value ? '正在上传…' : sent.value ? '日志已发送' : '发送反馈日志')
-const openWeqProject = async () => {
-  const url = 'https://github.com/H3CoF6/WeQ'
-  if (window.wechatDesktop?.openExternalUrl) await window.wechatDesktop.openExternalUrl(url)
-  else window.open(url, '_blank', 'noopener,noreferrer')
-}
-
 const clearScreenshots = () => {
   for (const item of pastedScreenshots.value) URL.revokeObjectURL(item.url)
   pastedScreenshots.value = []
@@ -237,7 +227,6 @@ onBeforeUnmount(clearScreenshots)
 
 <style scoped>
 .bug-feedback { display: grid; gap: 14px; padding: 20px 24px 18px; }
-.bug-feedback-weq-link { display: inline-flex; min-width: 0; flex: 1 1 0; align-items: flex-start; gap: 6px; border-left: 2px solid #0099ff; padding: 2px 0 2px 9px; color: #0099ff; font-size: 10.5px; font-weight: 500; line-height: 1.45; text-align: left; white-space: normal; }.bug-feedback-weq-link i { flex: 0 0 auto; margin-top: 2px; }.bug-feedback-weq-link:hover { color: #007dcc; text-decoration: underline; text-underline-offset: 2px; }
 .bug-feedback-status { display: flex; align-items: flex-start; gap: 10px; border-radius: 8px; padding: 11px 13px; font-size: 12px; }
 .bug-feedback-status { align-items: center; background: rgba(196,54,54,.08); color: #a12d2d; }.bug-feedback-status[data-state='online'] { background: rgba(7,183,91,.1); color: #087a40; }.bug-feedback-status[data-state='loading'] { background: var(--setup-surface-soft); color: var(--app-text-secondary); }
 .bug-feedback-layout, .bug-feedback-form { display: grid; gap: 13px; min-width: 0; }.bug-feedback-form { border: 1px solid var(--app-border); border-radius: 9px; background: var(--app-surface-bg); padding: 16px; }
