@@ -1006,10 +1006,10 @@
       :open="modifyTextUnavailableDialogOpen"
       export-style
       eyebrow="功能暂未开放"
-      title="功能暂未开放"
+      title="请添加 QQ 联系开发者"
       badge="暂时不可用"
       :description="modifyTextUnavailableMessage"
-      primary-label="我知道了"
+      primary-label="添加 QQ 992902319"
       secondary-label="关闭"
       tone="warning"
       @primary="contactDeveloper"

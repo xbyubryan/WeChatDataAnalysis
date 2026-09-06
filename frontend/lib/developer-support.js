@@ -1,3 +1,5 @@
-export const FEATURE_UNAVAILABLE_MESSAGE = '当前版本仅展示该功能入口，暂时无法执行。'
+import { openMessageExternalUrl } from '~/lib/chat/message-links'
 
-export const openDeveloperContact = () => {}
+export const FEATURE_UNAVAILABLE_MESSAGE = '当前版本仅展示该功能入口，暂时无法执行。请添加 QQ 992902319（备注「高级版」）联系开发者获取支持。'
+
+export const openDeveloperContact = () => openMessageExternalUrl('https://wpa.qq.com/msgrd?v=3&uin=992902319&site=qq&menu=yes')

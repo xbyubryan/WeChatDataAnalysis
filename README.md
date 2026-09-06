@@ -5,6 +5,10 @@
 <div align="center">
     <h1>WeChatDataAnalysis - 微信数据库解密与分析工具</h1>
     <p>微信4.x数据解密并生成年度总结，高仿微信，支持实时更新，导出聊天记录，朋友圈等大量便捷功能</p>
+    <p>如需定制功能，请联系 QQ：992902319。</p>
+    <img src="https://img.shields.io/github/v/tag/xbyubryan/WeChatDataAnalysis" alt="Version" />
+    <img src="https://img.shields.io/github/stars/xbyubryan/WeChatDataAnalysis" alt="Stars" />
+    <img src="https://img.shields.io/github/forks/xbyubryan/WeChatDataAnalysis" alt="Forks" />
     <img src="https://img.shields.io/badge/Python-3776AB?logo=Python&logoColor=white" alt="Python" />
     <img src="https://img.shields.io/badge/Vue.js-4FC08D?logo=Vue.js&logoColor=white" alt="Vue.js" />
     <img src="https://img.shields.io/badge/SQLite-003B57?logo=SQLite&logoColor=white" alt="SQLite" />
@@ -90,6 +94,8 @@
 ## 高级版
 
 常规版聚焦于**解密、读取、导出与年度总结**等只读能力；**高级版**在此基础上解锁一整套**写入、动作与实时提醒**能力，覆盖消息修改、消息补录、微信动作、朋友圈互动、群聊管理、联系人管理与关键词提醒。当前公开版本仅展示这些功能入口，实际执行需要高级版。
+
+> **获取方式**：请联系 QQ **992902319**（备注「高级版」）即可获取。
 
 | 模块 | 高级版功能 |
 | --- | --- |
