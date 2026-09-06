@@ -311,7 +311,7 @@ function render(ctx, data, dry) {
     const now = new Date()
     const pad2 = (n) => String(n).padStart(2, '0')
     const stamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`
-    ctx.fillText(`由 WeChatDataAnalysis 生成 · ${stamp} · AI 内容仅供参考`, innerX, cy + 28)
+    ctx.fillText(`作者：端木清 · ${stamp}`, innerX, cy + 28)
   })
   cy += 28 + 46
 
