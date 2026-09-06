@@ -197,6 +197,33 @@
         </div>
       </div>
 
+      <!-- Members -->
+      <div
+        class="sidebar-rail-action w-full h-[var(--sidebar-rail-step)] flex items-center justify-center cursor-pointer group"
+        title="成员发言统计"
+        @click="goMembers"
+      >
+        <div class="sidebar-rail-plate w-[var(--sidebar-rail-btn)] h-[var(--sidebar-rail-btn)] rounded-md flex items-center justify-center transition-colors bg-transparent">
+          <div class="sidebar-rail-icon w-[var(--sidebar-rail-icon)] h-[var(--sidebar-rail-icon)]" :class="{ 'sidebar-rail-icon-active': isMembersRoute }">
+            <svg
+              class="w-full h-full"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M16 20v-1.5a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20" />
+              <circle cx="9" cy="7" r="3.2" />
+              <path d="M22 20v-1.5a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.6a4 4 0 0 1 0 7.75" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
       <!-- Wrapped -->
       <div
         class="sidebar-rail-action w-full h-[var(--sidebar-rail-step)] flex items-center justify-center cursor-pointer group"
@@ -894,6 +921,7 @@ const isBizRoute = computed(() => route.path?.startsWith('/biz')) // 新增
 const isMiniProgramsRoute = computed(() => route.path?.startsWith('/mini-programs'))
 const isFinderRoute = computed(() => route.path?.startsWith('/finder'))
 const isPaymentsRoute = computed(() => route.path?.startsWith('/payments'))
+const isMembersRoute = computed(() => route.path?.startsWith('/members'))
 const isWrappedRoute = computed(() => route.path?.startsWith('/wrapped'))
 
 const goChat = async () => { await navigateTo('/chat') }
@@ -904,6 +932,7 @@ const goBiz = async () => { await navigateTo('/biz') }
 const goMiniPrograms = async () => { await navigateTo('/mini-programs') }
 const goFinder = async () => { await navigateTo('/finder') }
 const goPayments = async () => { await navigateTo('/payments') }
+const goMembers = async () => { await navigateTo('/members') }
 const goWrapped = async () => { await navigateTo('/wrapped') }
 const goGuide = async () => { await navigateTo('/') }
 const goSettings = () => { openSettingsDialog() }

@@ -643,6 +643,35 @@ def _wrapped_annual(args: dict[str, Any], _: McpToolContext) -> dict[str, Any]:
     return _clip_deep(payload, max_items=80)
 
 
+def _member_overview(args: dict[str, Any], _: McpToolContext) -> dict[str, Any]:
+    """群聊成员发言总览：每个成员的 wxid / 显示名 / 消息数 / 主题词 / 主线摘要。"""
+
+    from ..routers.chat_member_overview import build_member_overview
+
+    username = _str(args, "username") or _str(args, "session_id")
+    if not username:
+        raise ValueError("username is required.")
+
+    result = build_member_overview(
+        account=_account_arg(args),
+        username=username,
+        start_time=_opt_int(args, "start_time"),
+        end_time=_opt_int(args, "end_time"),
+        topics=_int(args, "topics", 8, minimum=0, maximum=30),
+        include_hidden=_bool(args, "include_hidden", False),
+        include_official=_bool(args, "include_official", False),
+        refresh=_bool(args, "refresh", False),
+    )
+
+    # 群成员可能上百人，默认只回前 50 名，避免撑爆客户端上下文。
+    limit = _int(args, "limit", 50, minimum=1, maximum=500)
+    members = list(result.get("members") or [])
+    if len(members) > limit:
+        result = {**result, "members": members[:limit], "truncated": len(members) - limit}
+
+    return _clip_deep(result, max_items=80)
+
+
 def _wrapped_cache_dir_readonly(account_dir: Any) -> Any:
     return account_dir / "_wrapped" / "cache"
 
@@ -1442,6 +1471,7 @@ def _install_tools() -> None:
     _register("wechat.analytics.get_wrapped_meta", "Return annual wrapped manifest.", object_schema({**COMMON_ACCOUNT, "year": int_schema("Optional year.")}), _wrapped_meta, package="wechat.analytics")
     _register("wechat.analytics.get_wrapped_card", "Return one annual wrapped card.", object_schema({**COMMON_ACCOUNT, "year": int_schema("Optional year."), "card_id": int_schema("Card id.", minimum=0)}, required=["card_id"]), _wrapped_card, package="wechat.analytics")
     _register("wechat.analytics.get_wrapped_annual", "Return full annual wrapped data. Prefer meta/card for mobile clients.", object_schema({**COMMON_ACCOUNT, "year": int_schema("Optional year.")}), _wrapped_annual, package="wechat.analytics")
+    _register("wechat.analytics.member_speaking_overview", "Return per-member speaking stats for one chat session: wxid, display name, message count, share, top topics, and a rule-based main thread.", object_schema({**COMMON_ACCOUNT, "username": string_schema("Session username. Group chats end with @chatroom."), "start_time": int_schema("Optional Unix seconds start.", minimum=0), "end_time": int_schema("Optional Unix seconds end.", minimum=0), "topics": int_schema("Topic keyword count per member.", minimum=0, maximum=30), "limit": int_schema("Maximum members returned.", minimum=1, maximum=500), "include_hidden": bool_schema("Include hidden sessions.", default=False), "include_official": bool_schema("Include official sessions.", default=False), "refresh": bool_schema("Ignore cache and recompute.", default=False)}, required=["username"]), _member_overview, package="wechat.analytics")
 
     _register("wechat.media.get_avatar_url", "Build a URL for a contact avatar.", object_schema({**COMMON_ACCOUNT, "username": string_schema("Contact username.")}, required=["username"]), _avatar_url, package="wechat.media")
     _register("wechat.media.get_chat_image_url", "Build a URL for a chat image message resource.", object_schema(additional_properties=True), _chat_image_url, package="wechat.media")

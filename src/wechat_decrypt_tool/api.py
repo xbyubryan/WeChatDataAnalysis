@@ -27,6 +27,7 @@ from .routers.chat_realtime_sse import router as _chat_realtime_sse_router
 from .routers.chat_contacts import router as _chat_contacts_router
 from .routers.chat_export import router as _chat_export_router
 from .routers.chat_media import router as _chat_media_router
+from .routers.chat_member_overview import router as _chat_member_overview_router
 from .routers.decrypt import router as _decrypt_router
 from .routers.import_decrypted import router as _import_decrypted_router
 from .routers.health import router as _health_router
@@ -141,6 +142,7 @@ app.include_router(_chat_realtime_sse_router)
 app.include_router(_chat_contacts_router)
 app.include_router(_chat_export_router)
 app.include_router(_chat_media_router)
+app.include_router(_chat_member_overview_router)
 app.include_router(_sns_router)
 app.include_router(_sns_export_router)
 app.include_router(_wrapped_router)

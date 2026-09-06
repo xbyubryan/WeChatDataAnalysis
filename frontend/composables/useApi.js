@@ -762,6 +762,21 @@ export const useApi = () => {
     return await request(`/sns/exports/${encodeURIComponent(String(exportId))}`, { method: 'DELETE' })
   }
 
+  // 群聊成员发言总览（成员 / wxid / 索引条目 / 主题命中 / 主线）
+  const getChatMemberOverview = async (params = {}) => {
+    const query = new URLSearchParams()
+    if (params && params.username) query.set('username', String(params.username))
+    if (params && params.account) query.set('account', String(params.account))
+    if (params && params.start_time != null) query.set('start_time', String(params.start_time))
+    if (params && params.end_time != null) query.set('end_time', String(params.end_time))
+    if (params && params.topics != null) query.set('topics', String(params.topics))
+    if (params && params.include_hidden != null) query.set('include_hidden', String(!!params.include_hidden))
+    if (params && params.include_official != null) query.set('include_official', String(!!params.include_official))
+    if (params && params.refresh != null) query.set('refresh', String(!!params.refresh))
+    const url = '/chat/member-overview' + (query.toString() ? `?${query.toString()}` : '')
+    return await request(url, params?.signal ? { signal: params.signal } : {})
+  }
+
   // 联系人
   const listChatContacts = async (params = {}) => {
     const query = new URLSearchParams()
@@ -1175,6 +1190,7 @@ export const useApi = () => {
     cancelSnsExport,
     listChatContacts,
     getChatContactProfile,
+    getChatMemberOverview,
     exportChatContacts,
     createAccountArchiveExport,
     getAccountArchiveExport,

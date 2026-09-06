@@ -113,6 +113,7 @@ const accountDataRoutePrefixes = [
   '/finder',
   '/payments',
   '/revokes',
+  '/members',
   '/wrapped'
 ]
 
