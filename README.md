@@ -126,6 +126,14 @@
 
 > Excel 格式生成 `.xlsx` 文件；聊天记录、朋友圈和收藏会将对应格式文件与必要资源一起打包为 ZIP。
 
+## 加入群聊
+
+欢迎加入讨论。
+
+<p align="center">
+    <img src="frontend/public/qq-group-qr.jpg" alt="QQ 群二维码（时光の流逝，群号 168698224）" width="360" />
+</p>
+
 ## 快速开始
 
 ### 1. 下载桌面安装包（推荐）
