@@ -100,6 +100,9 @@ _STOPWORDS = {
     "今天", "明天", "昨天", "晚上", "中午", "早上", "周末", "星期", "周一",
     "周二", "周三", "周四", "周五", "周六", "周日", "上午", "下午", "今年",
     "去年", "明年", "哪天", "几点", "收到", "好的", "好吧", "行吧", "哈哈",
+    # 真实群数据验证（2026-09-06，99k 条样本）补充的高频废词
+    "哪里", "这么", "看看", "群里", "必须", "突然", "天天", "一天天",
+    "感觉", "可能", "直接", "怎么办", "怎么样", "有没有", "是不是", "不要",
     "the", "a", "an", "is", "are", "to", "of", "and", "or", "it", "this", "that",
     "for", "in", "on", "at", "be", "do", "not", "you", "i", "we", "he", "she",
     "https", "http", "com", "www",
@@ -193,8 +196,26 @@ _ACTIVE_LEVELS = (
     (0.0, "潜水"),
 )
 
+# 相对档位阈值：share / 全员均分份额 的比值。绝对档位在大群里会失真——
+# 50 人群的均分只有 2%，一个 3.7%（近 2 倍均分）的成员按绝对阈值会被误判成"潜水"。
+_RELATIVE_ACTIVE_LEVELS = (
+    (6.0, "核心话事人"),
+    (2.5, "活跃"),
+    (1.0, "常规"),
+)
 
-def _activity_level(share_pct: float) -> str:
+
+def _activity_level(share_pct: float, member_count: int = 0) -> str:
+    # 绝对主导优先：任何规模的群，占比 ≥30% 都是核心话事人。
+    if share_pct >= 30.0:
+        return "核心话事人"
+    if member_count and member_count > 1:
+        ratio = share_pct / (100.0 / member_count)
+        for threshold, label in _RELATIVE_ACTIVE_LEVELS:
+            if ratio >= threshold:
+                return label
+        return "潜水"
+    # 没有成员数时退化到绝对阈值（兼容旧调用）。
     for threshold, label in _ACTIVE_LEVELS:
         if share_pct >= threshold:
             return label
@@ -209,6 +230,7 @@ def _build_main_thread(
     topics: list[dict[str, Any]],
     last_time: int,
     is_self: bool,
+    member_count: int = 0,
 ) -> str:
     """规则式一句话主线。
 
@@ -216,7 +238,7 @@ def _build_main_thread(
     避免把聊天原文外发给任何在线模型。
     """
 
-    level = _activity_level(share_pct)
+    level = _activity_level(share_pct, member_count)
 
     now_ts = int(time.time())
     days_idle = -1
@@ -611,6 +633,7 @@ def build_member_overview(
                         topics=member_topics,
                         last_time=last_time,
                         is_self=bool(self_username and sender == self_username),
+                        member_count=len(rows),
                     ),
                 }
             )
